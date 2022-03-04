@@ -206,5 +206,9 @@ fn main() {
         "Average time per hash: {:.2?}",
         elapsed / hashes.len().try_into().unwrap()
     );
+    println!(
+        "Hashes per second: {:.2}",
+        hashes.len() as f64 / elapsed.as_secs_f64()
+    );
     println!("All Done!");
 }
