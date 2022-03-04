@@ -1,0 +1,2 @@
+./random_hash_file/target/release/random_hash_file $1 $2 $3
+

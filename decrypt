@@ -1,0 +1,1 @@
+./hash_decrypt/target/release/Hash-Breaker $1 $2 $3
