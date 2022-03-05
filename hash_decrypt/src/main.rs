@@ -6,6 +6,8 @@ use std::io::{BufRead, BufReader};
 use std::time::Instant;
 use std::{env, fmt, io};
 
+use std::sync::{Arc, Mutex};
+
 use md5::{Digest, Md5};
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
@@ -110,18 +112,24 @@ fn parse_file(path: &str) -> Result<HashSet<String>, io::Error> {
 }
 
 // Crack the hashes
-fn cracking_time(alg: &HashAlg, hashes: &HashSet<String>, words: &HashSet<String>) {
+fn cracking_time(alg: &HashAlg, hashes: &HashSet<String>, words: &HashSet<String>) -> Vec<String> {
+    let cracked: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
     words.par_iter().for_each(|pass| {
         // Parallel for loop (outer, password)
         words.par_iter().for_each(|salt| {
             // Parallel for loop (inner, salt)
+            let temp = cracked.clone();
             let hash = hashes.get(&alg.create_hash(pass, salt)); // if hash in list of hashes, returns the hash
             if hash.is_some() {
                 // If hash was found, print
-                println!("{} -> {} + {}", hash.unwrap(), pass, salt);
+                temp.lock().unwrap().push(pass.to_string());
+                //println!("{} -> {} + {}", hash.unwrap(), pass, salt);
             }
         })
     });
+
+    let ret = cracked.lock().unwrap().to_vec();
+    ret
 }
 
 // Find the algorithm used if not given by the user
@@ -198,8 +206,10 @@ fn main() {
 
     println!("Cracking {} hashes!\n", hashes.len());
     now = Instant::now(); // Start timer
-    cracking_time(&i, &hashes, &words); // Crack the hashes
+    let cracked = cracking_time(&i, &hashes, &words); // Crack the hashes
     elapsed = now.elapsed(); // End timer
+
+    println!("{:#?}", cracked);
 
     println!("\nCracked in: {:.2?}", elapsed);
     println!(
