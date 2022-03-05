@@ -1,5 +1,5 @@
 use rayon::prelude::*;
-use std::collections::{HashSet, HashMap};
+use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -13,10 +13,18 @@ use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use whirlpool::Whirlpool;
 
-#[derive(Debug, Clone, Hash)]
+#[derive(PartialEq, Eq, Clone, Hash)]
 struct Info {
+    hash: String,
     pass: String,
     salt: String,
+}
+
+// Implement display for Passwords
+impl fmt::Display for Info {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} =>\n{} + {}", self.hash, self.pass, self.salt)
+    }
 }
 
 // Hashing algorithms that are supported currently
@@ -118,8 +126,12 @@ fn parse_file(path: &str) -> Result<HashSet<String>, io::Error> {
 }
 
 // Crack the hashes
-fn cracking_time(alg: &HashAlg, hashes: &HashSet<String>, words: &HashSet<String>) -> HashMap<String, Info> {
-    let cracked: Arc<Mutex<HashMap<String, Info>>> = Arc::new(Mutex::new(HashMap::new()));
+fn cracking_time(
+    alg: &HashAlg,
+    hashes: &HashSet<String>,
+    words: &HashSet<String>,
+) -> HashSet<Info> {
+    let cracked: Arc<Mutex<HashSet<Info>>> = Arc::new(Mutex::new(HashSet::new()));
     words.par_iter().for_each(|pass| {
         // Parallel for loop (outer, password)
         words.par_iter().for_each(|salt| {
@@ -128,8 +140,11 @@ fn cracking_time(alg: &HashAlg, hashes: &HashSet<String>, words: &HashSet<String
             let hash = hashes.get(&alg.create_hash(pass, salt)); // if hash in list of hashes, returns the hash
             if hash.is_some() {
                 // If hash was found, print
-                temp.lock().unwrap().insert(hash.unwrap().to_string(), Info {pass: pass.to_string(), salt: salt.to_string()});
-                //println!("{} -> {} + {}", hash.unwrap(), pass, salt);
+                temp.lock().unwrap().insert(Info {
+                    hash: hash.unwrap().to_string(),
+                    pass: pass.to_string(),
+                    salt: salt.to_string(),
+                });
             }
         })
     });
@@ -215,7 +230,9 @@ fn main() {
     let cracked = cracking_time(&i, &hashes, &words); // Crack the hashes
     elapsed = now.elapsed(); // End timer
 
-    println!("{:#?}", cracked);
+    for info in cracked {
+        println!("{}\n", info);
+    }
 
     println!("\nCracked in: {:.2?}", elapsed);
     println!(
