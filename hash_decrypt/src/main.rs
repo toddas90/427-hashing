@@ -1,5 +1,5 @@
 use rayon::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::convert::TryInto;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -12,6 +12,12 @@ use md5::{Digest, Md5};
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use whirlpool::Whirlpool;
+
+#[derive(Debug, Clone, Hash)]
+struct Info {
+    pass: String,
+    salt: String,
+}
 
 // Hashing algorithms that are supported currently
 #[derive(Clone)]
@@ -112,8 +118,8 @@ fn parse_file(path: &str) -> Result<HashSet<String>, io::Error> {
 }
 
 // Crack the hashes
-fn cracking_time(alg: &HashAlg, hashes: &HashSet<String>, words: &HashSet<String>) -> Vec<String> {
-    let cracked: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+fn cracking_time(alg: &HashAlg, hashes: &HashSet<String>, words: &HashSet<String>) -> HashMap<String, Info> {
+    let cracked: Arc<Mutex<HashMap<String, Info>>> = Arc::new(Mutex::new(HashMap::new()));
     words.par_iter().for_each(|pass| {
         // Parallel for loop (outer, password)
         words.par_iter().for_each(|salt| {
@@ -122,14 +128,14 @@ fn cracking_time(alg: &HashAlg, hashes: &HashSet<String>, words: &HashSet<String
             let hash = hashes.get(&alg.create_hash(pass, salt)); // if hash in list of hashes, returns the hash
             if hash.is_some() {
                 // If hash was found, print
-                temp.lock().unwrap().push(pass.to_string());
+                temp.lock().unwrap().insert(hash.unwrap().to_string(), Info {pass: pass.to_string(), salt: salt.to_string()});
                 //println!("{} -> {} + {}", hash.unwrap(), pass, salt);
             }
         })
     });
 
-    let ret = cracked.lock().unwrap().to_vec();
-    ret
+    let ret = cracked.lock().unwrap();
+    ret.to_owned()
 }
 
 // Find the algorithm used if not given by the user
